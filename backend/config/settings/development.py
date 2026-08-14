@@ -1,4 +1,5 @@
 from .base import *
+from decouple import config
 
 DEBUG = True
 
@@ -28,8 +29,14 @@ CACHES = {
 SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
 SESSION_CACHE_ALIAS = 'default'
 
-# --- Emails print to terminal, no real sending ---
+# --- Print emails to the terminal in development ---
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_USE_SSL = False
+EMAIL_HOST_USER = config('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
 
 # --- Django Channels (local Redis layer) ---
 CHANNEL_LAYERS = {

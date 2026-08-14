@@ -1,9 +1,12 @@
 import uuid
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
+from apps.core.models import TimeStampedUUIDModel
 
 
 class UserManager(BaseUserManager):
+    """Custom manager for user model"""
+
     def create_user(self, email, password=None, **extra_fields):
         if not email:
             raise ValueError("Email is required")
@@ -19,20 +22,27 @@ class UserManager(BaseUserManager):
         return self.create_user(email, password, **extra_fields)
 
 
-class User(AbstractBaseUser, PermissionsMixin):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+class User(AbstractBaseUser, PermissionsMixin, TimeStampedUUIDModel):
+    username = None
     email = models.EmailField(unique=True)
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
-    date_joined = models.DateTimeField(auto_now_add=True)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["first_name", "last_name"]
 
     objects = UserManager()
 
+    class Meta:
+        verbose_name = 'User'
+        verbose_name_plural = 'Users'
+        indexes = [
+            models.Index(fields=['email'], name='idx_user_email')
+        ]
+
+    @property
     def get_fullname(self):
         return f"{self.first_name} {self.last_name}"
 
@@ -40,11 +50,9 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.email
 
 
-class Address(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+class Address(TimeStampedUUIDModel):
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="addresses")
-    full_name = models.CharField(max_length=200)
     phone = models.CharField(max_length=20)
     address_line1 = models.CharField(max_length=255)
     address_line2 = models.CharField(max_length=255, blank=True)
@@ -52,7 +60,6 @@ class Address(models.Model):
     region = models.CharField(max_length=100)
     country = models.CharField(max_length=100, default="Ghana")
     is_default = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name_plural = "addresses"
@@ -66,4 +73,12 @@ class Address(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.full_name} — {self.city}"
+        return f"{self.email} — {self.city}"
+
+    def save(self, *args, **kwargs):
+        if self.is_default:
+            Address.objects.filter(
+                user=self.user,
+                is_default=True
+            ).exclude(pk=self.pk).update(is_default=False)
+        super().save(*args, **kwargs)

@@ -1,6 +1,8 @@
 from pathlib import Path
+import importlib.util
 import os
 from decouple import config
+from datetime import timedelta
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -19,11 +21,12 @@ INSTALLED_APPS = [
     'corsheaders',
     'django_filters',
     'channels',
-    'django_celery_beat',
+    'rest_framework_simplejwt.token_blacklist',
 
     # Your apps
     'apps.accounts',
-    'apps.catalogue',
+    'apps.core',
+    'apps.products',
     'apps.payments',
     'apps.reviews',
     'apps.cart',
@@ -31,6 +34,9 @@ INSTALLED_APPS = [
     'apps.discounts',
     'apps.notifications',
 ]
+
+if importlib.util.find_spec('django_celery_beat'):
+    INSTALLED_APPS.append('django_celery_beat')
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -64,6 +70,16 @@ TEMPLATES = [
         },
     },
 ]
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+}
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
@@ -128,7 +144,7 @@ USE_TZ = True
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'mail.privateemail.com'
+EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_USE_SSL = False

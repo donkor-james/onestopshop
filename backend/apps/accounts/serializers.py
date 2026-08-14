@@ -61,7 +61,6 @@ class UserSerializer(serializers.ModelSerializer):
             "last_name",
             "full_name",
             "is_active",
-            "date_joined",
         ]
 
     def get_full_name(self, obj):
@@ -85,7 +84,7 @@ class UpdateProfileSerializer(serializers.ModelSerializer):
 
 
 class VerifyOtpSerializer(serializers.Serializer):
-    otp = serializers.CharField(require=True)
+    otp = serializers.CharField(required=True)
     email = serializers.EmailField(required=True)
 
     def validate_email(self, value):
@@ -93,3 +92,45 @@ class VerifyOtpSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 "User with this email does not exist")
         return value
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True, min_length=8)
+    confirm_password = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        if attrs["new_password"] != attrs["confirm_password"]:
+            raise serializers.ValidationError(
+                {"confirm_password": "Passwords do not match"}
+            )
+
+        try:
+            validate_password(attrs["new_password"])
+        except ValidationError as exc:
+            raise serializers.ValidationError(
+                {"new_password": list(exc.messages)})
+
+        return attrs
+
+
+class AddressSerializer(serializers.ModelSerializer):
+    full_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Address
+        fields = [
+            "id",
+            "full_name",
+            "phone",
+            "address_line1",
+            "address_line2",
+            "city",
+            "region",
+            "country",
+            "is_default",
+            "created_at",
+        ]
+
+    def get_full_name(self, obj):
+        return f"{obj.user.first_name} {obj.user.last_name}"
