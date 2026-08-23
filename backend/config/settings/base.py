@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     'django_filters',
     'channels',
     'rest_framework_simplejwt.token_blacklist',
+    'django_celery_beat',
 
     # Your apps
     'apps.accounts',
@@ -35,8 +36,6 @@ INSTALLED_APPS = [
     'apps.notifications',
 ]
 
-if importlib.util.find_spec('django_celery_beat'):
-    INSTALLED_APPS.append('django_celery_beat')
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -80,6 +79,7 @@ SIMPLE_JWT = {
     'SIGNING_KEY': SECRET_KEY,
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
+
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},

@@ -1,7 +1,8 @@
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from apps.discounts.serializers import ApplyDiscountSerializer, DiscountCodeSerializer
+from .serialilzers import ApplyDiscountSerializer, DiscountCodeSerializer
+from apps.cart.models import Cart
 
 
 class ApplyDiscountView(generics.GenericAPIView):
@@ -17,6 +18,7 @@ class ApplyDiscountView(generics.GenericAPIView):
 
         # apply_to() is a model method — calculates in Python,
         # no extra DB query needed
+
         discounted_total = discount.apply_to(cart_total)
 
         return Response({

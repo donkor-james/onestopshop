@@ -23,10 +23,10 @@ urlpatterns = [
     path('api/accounts/', include('apps.accounts.urls')),
     path('api/', include('apps.products.urls')),
     path('api/', include('apps.cart.urls')),
-    # path('api/', include('apps.orders.urls')),
+    path('api/', include('apps.orders.urls')),
     # path('api/', include('apps.payments.urls')),
     path('api/', include('apps.reviews.urls')),
-    # path('api/', include('apps.discounts.urls')),
+    path('api/', include('apps.discounts.urls')),
 ]
 
 if settings.DEBUG:

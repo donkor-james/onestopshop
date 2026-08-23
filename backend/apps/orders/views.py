@@ -108,7 +108,7 @@ class CheckoutView(generics.GenericAPIView):
             )
 
         address = Address.objects.only(
-            'street', 'city', 'region', 'country'
+            'address_line1', 'city', 'region', 'country'
         ).get(id=serializer.validated_data['address_id'])
 
         discount = None
@@ -144,7 +144,7 @@ class CheckoutView(generics.GenericAPIView):
                     user=request.user,
                     total_amount=max(total, 0),
                     shipping_address={
-                        'street': address.street,
+                        'address_line': address.address_line1,
                         'city': address.city,
                         'region': address.region,
                         'country': address.country,

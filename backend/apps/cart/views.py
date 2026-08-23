@@ -122,8 +122,6 @@ class CartClearView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
 
     def delete(self, request):
-        # delete() on a queryset issues a single DELETE WHERE query —
-        # more efficient than fetching each item and deleting individually
         CartItem.objects.filter(cart__user=request.user).delete()
         cache.delete(get_cart_cache_key(request.user.id))
         return Response(status=status.HTTP_204_NO_CONTENT)
