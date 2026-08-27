@@ -34,11 +34,13 @@ def send_order_confirmation_email(self, order_id):
             fail_silently=False,
         )
 
+        print(f'Email sent for order {order.reference} to {order.user.email}')
         logger.info(
             f'Order confirmation email sent for order {order.reference}')
-        return f'Email sent for order {order.reference}'
+        return f'Email sent for order {order.reference} to {order.user.email}'
 
     except Exception as exc:
+        print(f'Failed to send email for order {order_id}: {exc}')
         logger.error(f'Failed to send email for order {order_id}: {exc}')
         raise self.retry(exc=exc)
 
@@ -67,9 +69,11 @@ def send_shipping_update_email(self, order_id):
             fail_silently=False,
         )
 
+        print(f'Shipping update email sent for order {order.reference}')
         logger.info(f'Shipping update email sent for order {order.reference}')
 
     except Exception as exc:
+        print(f'Failed to send shipping email for order {order_id}: {exc}')
         logger.error(
             f'Failed to send shipping email for order {order_id}: {exc}')
         raise self.retry(exc=exc)

@@ -47,6 +47,7 @@ class CartItemSerializer(serializers.ModelSerializer):
         return image.image.url if image else None
 
     def validate_quantity(self, value):
+        print(f"Validating quantity: {value}")
         if value < 1:
             raise serializers.ValidationError('Quantity must be at least 1')
         return value
