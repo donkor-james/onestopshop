@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
-
+from drf_spectacular.utils import extend_schema_field
 from .models import User, Address
 
 
@@ -63,6 +63,7 @@ class UserSerializer(serializers.ModelSerializer):
             "is_active",
         ]
 
+    @extend_schema_field(serializers.CharField())
     def get_full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}"
 
@@ -132,5 +133,6 @@ class AddressSerializer(serializers.ModelSerializer):
             "created_at",
         ]
 
+    @extend_schema_field(serializers.CharField())
     def get_full_name(self, obj):
-        return f"{obj.user.first_name} {obj.user.last_name}"
+        return f'{obj.user.first_name} {obj.user.last_name}'

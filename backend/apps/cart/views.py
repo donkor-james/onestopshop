@@ -8,6 +8,8 @@ from django.db.models import F, Sum, Count, ExpressionWrapper, DecimalField, Pre
 from apps.cart.models import Cart, CartItem
 from apps.cart.serializers import CartSerializer, CartItemSerializer
 from apps.products.models import ProductVariant, ProductImage
+from rest_framework.views import APIView
+from drf_spectacular.utils import extend_schema, OpenApiResponse
 
 
 def get_cart_cache_key(user_id):
@@ -105,6 +107,8 @@ class CartItemUpdateView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return CartItem.objects.none()
         return CartItem.objects.filter(
             cart__user=self.request.user
         ).select_related('variant__product')
@@ -118,7 +122,14 @@ class CartItemUpdateView(generics.RetrieveUpdateDestroyAPIView):
         cache.delete(get_cart_cache_key(self.request.user.id))
 
 
-class CartClearView(generics.GenericAPIView):
+@extend_schema(
+    tags=['Cart'],
+    summary='Clear cart',
+    description='Removes all items from the cart in a single DELETE query.',
+    request=None,
+    responses={204: OpenApiResponse(description='Cart cleared')}
+)
+class CartClearView(APIView):
     permission_classes = [IsAuthenticated]
 
     def delete(self, request):

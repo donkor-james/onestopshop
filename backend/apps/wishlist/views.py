@@ -3,6 +3,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
 from django.db.models import Count, Prefetch
+from rest_framework.views import APIView
+from drf_spectacular.utils import extend_schema, OpenApiResponse
 from apps.wishlist.models import Wishlist, WishlistItem
 from apps.wishlist.serializers import (
     WishlistSerializer,
@@ -93,8 +95,11 @@ class WishlistItemAddView(generics.CreateAPIView):
 class WishlistItemDeleteView(generics.DestroyAPIView):
     """Remove a product from wishlist"""
     permission_classes = [IsAuthenticated]
+    serializer_class = WishlistItemSerializer
 
     def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return WishlistItem.objects.none()
         return WishlistItem.objects.filter(
             wishlist__user=self.request.user
         )
@@ -108,16 +113,20 @@ class WishlistItemDeleteView(generics.DestroyAPIView):
         )
 
 
-class WishlistClearView(generics.GenericAPIView):
-    """Remove all items from wishlist"""
+@extend_schema(
+    tags=['Wishlist'],
+    summary='Clear wishlist',
+    description='Removes all items from the wishlist.',
+    request=None,
+    responses={200: OpenApiResponse(description='Wishlist cleared')}
+)
+class WishlistClearView(APIView):  # ← APIView not GenericAPIView
     permission_classes = [IsAuthenticated]
 
     def delete(self, request):
-        # Single DELETE WHERE query — no fetching needed
         deleted_count, _ = WishlistItem.objects.filter(
             wishlist__user=request.user
         ).delete()
-
         return Response(
             {'message': f'{deleted_count} items removed from wishlist'},
             status=status.HTTP_200_OK

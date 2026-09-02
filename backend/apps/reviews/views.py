@@ -14,6 +14,8 @@ class ProductReviewListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return Review.objects.none()
         return (
             Review.objects
             .filter(product__slug=self.kwargs['slug'])
@@ -65,6 +67,8 @@ class ReviewDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return Review.objects.none()
         return Review.objects.filter(
             user=self.request.user
         ).select_related('user')
@@ -76,6 +80,7 @@ class ProductRatingSummaryView(generics.GenericAPIView):
     All computed in a single aggregation query — no Python loops.
     """
     permission_classes = [IsAuthenticatedOrReadOnly]
+    serializer_class = ProductRatingSummarySerializer  # ← add this
 
     def get(self, request, slug):
         # All aggregations run in ONE query using conditional Count

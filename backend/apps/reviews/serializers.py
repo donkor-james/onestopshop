@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from apps.reviews.models import Review
+from drf_spectacular.utils import extend_schema_field
 
 
 class ReviewSerializer(serializers.ModelSerializer):
@@ -16,6 +17,7 @@ class ReviewSerializer(serializers.ModelSerializer):
             'id', 'user_name', 'is_verified_purchase', 'created_at'
         ]
 
+    @extend_schema_field(serializers.CharField())
     def get_user_name(self, obj):
         # obj.user is already select_related — no extra query here
         return f'{obj.user.first_name} {obj.user.last_name[0]}.'

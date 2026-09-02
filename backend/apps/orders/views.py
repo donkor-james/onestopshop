@@ -10,6 +10,7 @@ from apps.orders.tasks import send_order_confirmation_email
 from apps.cart.models import Cart, CartItem
 from apps.accounts.models import Address
 from apps.discounts.models import DiscountCode
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 
 
 class OrderListView(generics.ListAPIView):
@@ -17,6 +18,8 @@ class OrderListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return Order.objects.none()
         return (
             Order.objects
             .filter(user=self.request.user)
@@ -51,6 +54,8 @@ class OrderDetailView(generics.RetrieveAPIView):
     lookup_field = 'reference'
 
     def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return Order.objects.none()
         return (
             Order.objects
             .filter(user=self.request.user)
@@ -78,6 +83,16 @@ class CheckoutView(generics.GenericAPIView):
     serializer_class = CheckoutSerializer
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary='Checkout',
+        description="""
+            Creates an order from the current cart.
+            Applies discount if provided.
+            Deducts stock atomically.
+            Fires order confirmation email via Celery.
+        """,
+        responses={201: OrderSerializer}
+    )
     def post(self, request):
         serializer = self.get_serializer(
             data=request.data,

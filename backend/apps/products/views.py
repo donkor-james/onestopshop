@@ -3,6 +3,7 @@ from rest_framework.permissions import IsAdminUser, AllowAny, IsAuthenticatedOrR
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Avg, Count, Min, Sum, Prefetch
 from django.utils.decorators import method_decorator
+from drf_spectacular.utils import extend_schema, OpenApiResponse, inline_serializer
 from django.views.decorators.cache import cache_page
 from django.core.cache import cache
 from apps.products.models import Category, Product, ProductImage, ProductVariant
@@ -20,6 +21,8 @@ class CategoryListView(generics.ListAPIView):
     permission_classes = [AllowAny]
 
     def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return Category.objects.none()
         return (
             Category.objects.all()
             # Count subcategories directly in the query —
@@ -41,6 +44,8 @@ class CategoryDetailView(generics.RetrieveAPIView):
     lookup_field = 'slug'
 
     def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return Category.objects.none()
         return (
             Category.objects.all()
             .annotate(subcategory_count=Count('subcategories'))
@@ -63,6 +68,8 @@ class ProductListView(generics.ListAPIView):
     ordering = ['-created_at']
 
     def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return Product.objects.none()
         return (
             Product.objects.filter(is_active=True)
             .select_related('category')
@@ -96,13 +103,22 @@ class ProductListView(generics.ListAPIView):
     def get(self, *args, **kwargs):
         return super().get(*args, **kwargs)
 
+# products/views.py
 
+
+@extend_schema(
+    tags=['Products'],
+    summary='Product detail',
+    description=''
+)
 class ProductDetailView(generics.RetrieveAPIView):
     serializer_class = ProductDetailSerializer
     permission_classes = [AllowAny]
     lookup_field = 'slug'
 
     def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return Product.objects.none()
         return (
             Product.objects.filter(is_active=True)
             .select_related('category')
@@ -135,6 +151,8 @@ class ProductReviewListView(generics.ListAPIView):
     permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return Review.objects.none()
         return (
             Review.objects.filter(
                 product__slug=self.kwargs['slug']

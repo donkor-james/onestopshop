@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from apps.cart.models import Cart, CartItem
+from drf_spectacular.utils import extend_schema_field
 
 
 class CartItemSerializer(serializers.ModelSerializer):
@@ -38,6 +39,7 @@ class CartItemSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id']
 
+    @extend_schema_field(serializers.URLField(allow_null=True))
     def get_product_image(self, obj):
         # All images belong to variants now — no product-level images
         image = next(

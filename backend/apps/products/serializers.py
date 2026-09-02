@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from apps.products.models import Category, Product, ProductVariant, ProductImage
+from drf_spectacular.utils import extend_schema_field
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -51,6 +52,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             'colors', 'sizes'
         ]
 
+    @extend_schema_field(serializers.ListField(child=serializers.CharField()))
     def get_colors(self, obj):
         seen = set()
         colors = []
@@ -62,6 +64,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
                 colors.append(variant.color)
         return colors
 
+    @extend_schema_field(serializers.ListField(child=serializers.CharField()))
     def get_sizes(self, obj):
         seen = set()
         sizes = []
@@ -91,6 +94,7 @@ class ProductListSerializer(serializers.ModelSerializer):
             'category_name', 'primary_image', 'avg_rating', 'review_count'
         ]
 
+    @extend_schema_field(serializers.URLField(allow_null=True))
     def get_primary_image(self, obj):
         # Variants and their images are already prefetched —
         # no extra query here

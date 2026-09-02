@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from apps.wishlist.models import Wishlist, WishlistItem
 from apps.products.models import ProductVariant
+from drf_spectacular.utils import extend_schema_field
 
 
 class WishlistItemSerializer(serializers.ModelSerializer):
@@ -28,6 +29,7 @@ class WishlistItemSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'created_at']
 
+    @extend_schema_field(serializers.URLField(allow_null=True))
     def get_primary_image(self, obj):
         # Get first variant's primary image — already prefetched
         first_variant = obj.product.variants.all().first()
@@ -39,6 +41,7 @@ class WishlistItemSerializer(serializers.ModelSerializer):
         )
         return primary.image.url if primary else None
 
+    @extend_schema_field(serializers.BooleanField())
     def get_is_in_stock(self, obj):
         # Check if any variant has stock — already prefetched
         return any(

@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     'channels',
     'rest_framework_simplejwt.token_blacklist',
     'django_celery_beat',
+    'drf_spectacular',
 
     # Your apps
     'apps.accounts',
@@ -89,8 +90,20 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-# --- DRF ---
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'OneStopShop API',
+    'DESCRIPTION': 'A single vendor fashion e-commerce REST API built with Django REST Framework',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'CONTACT': {
+        'name': 'Donkor James',
+        'email': 'jamesdonkor987@gmail.com',
+    },
+}
+
+
 REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
