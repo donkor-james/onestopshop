@@ -44,8 +44,9 @@ DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='')
 
 # Whitenoise for static files
 MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # S3 for media (optional for now — can add later)
 # If you don't set these Railway will just not serve media
