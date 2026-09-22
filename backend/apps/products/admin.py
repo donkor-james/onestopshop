@@ -16,13 +16,6 @@ class ProductVariantInline(admin.TabularInline):
     inlines = [ProductImageInline]
 
 
-@admin.register(category.Category)
-class CategoryAdmin(admin.ModelAdmin):
-    list_display = ('name', 'slug', 'parent')
-    search_fields = ('name', 'slug')
-    ordering = ('name',)
-
-
 @admin.register(variant.ProductVariant)
 class ProductVariantAdmin(admin.ModelAdmin):
     inlines = [ProductImageInline]
