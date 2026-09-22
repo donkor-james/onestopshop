@@ -6,24 +6,24 @@ from apps.products.models import product, image, variant, category
 
 
 class ProductImageInline(admin.TabularInline):
-    model = image.ProductImage
-    extra = 1  # Number of empty forms to display
+    model = ProductImage
+    extra = 1
+    fields = ['image', 'is_primary', 'order']
 
 
 class ProductVariantInline(admin.TabularInline):
-    model = variant.ProductVariant
-    extra = 1  # Number of empty forms to display
-    inlines = [ProductImageInline]
+    model = ProductVariant
+    extra = 1
+    fields = ['size', 'color', 'sku', 'stock_qty', 'price_override']
 
 
-@admin.register(variant.ProductVariant)
+@admin.register(ProductVariant)
 class ProductVariantAdmin(admin.ModelAdmin):
+    list_display = ['product', 'size', 'color',
+                    'sku', 'stock_qty', 'price_override']
+    list_filter = ['size', 'color']
+    search_fields = ['sku', 'product__name']
     inlines = [ProductImageInline]
-    list_display = ('product', 'size', 'color', 'sku',
-                    'stock_qty', 'price_override')
-    list_filter = ('product__category',)
-    search_fields = ('product__name', 'sku')
-    ordering = ('product', 'size', 'color')
 
 
 @admin.register(Category)
@@ -46,7 +46,7 @@ class ProductAdmin(admin.ModelAdmin):
     list_filter = ['is_active', 'category']
     search_fields = ['name', 'description']
     prepopulated_fields = {'slug': ('name',)}
-    inlines = [ProductVariantInline, ProductImageInline]
+    inlines = [ProductVariantInline]
 
 
 @admin.register(ProductImage)

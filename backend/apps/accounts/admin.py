@@ -5,16 +5,15 @@ from .models import User, Address
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    list_display = ['email', 'first_name', 'last_name',
-                    'is_active', 'is_staff', 'created_at']
-    list_filter = ['is_active', 'is_staff', 'is_verified']
+    list_display = ['email', 'first_name',
+                    'last_name', 'is_active', 'is_staff']
+    list_filter = ['is_active', 'is_staff']
     search_fields = ['email', 'first_name', 'last_name']
-    ordering = ['-created_at']
+    ordering = ['-date_joined']
     fieldsets = (
         (None, {'fields': ('email', 'password')}),
         ('Personal info', {'fields': ('first_name', 'last_name', 'phone')}),
-        ('Permissions', {'fields': ('is_active',
-         'is_staff', 'is_superuser', 'is_verified')}),
+        ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser')}),
         ('Important dates', {'fields': ('last_login',)}),
     )
     add_fieldsets = (
@@ -23,11 +22,11 @@ class UserAdmin(BaseUserAdmin):
             'fields': ('email', 'first_name', 'last_name', 'password1', 'password2'),
         }),
     )
+    ordering = ['-date_joined']
 
 
 @admin.register(Address)
 class AddressAdmin(admin.ModelAdmin):
-    list_display = ['user', 'street', 'city',
-                    'region', 'country', 'is_default']
+    list_display = ['user', 'city', 'region', 'country', 'is_default']
     list_filter = ['country', 'is_default']
-    search_fields = ['user__email', 'street', 'city']
+    search_fields = ['user__email', 'city']
