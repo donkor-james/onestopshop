@@ -1,3 +1,7 @@
+from sentry_sdk.integrations.redis import RedisIntegration
+from sentry_sdk.integrations.celery import CeleryIntegration
+from sentry_sdk.integrations.django import DjangoIntegration
+import sentry_sdk
 from .base import *
 import dj_database_url
 
@@ -87,3 +91,16 @@ LOGGING = {
         'django.request': {'handlers': ['console'], 'level': 'ERROR', 'propagate': False},
     },
 }
+
+
+sentry_sdk.init(
+    dsn=config('SENTRY_DSN', default=''),
+    integrations=[
+        DjangoIntegration(),
+        CeleryIntegration(),
+        RedisIntegration(),
+    ],
+    traces_sample_rate=0.1,  # 10% of requests tracked for performance
+    send_default_pii=False,  # don't send personal data to Sentry
+    environment='production',
+)

@@ -1,18 +1,24 @@
 from django.contrib import admin
-from .models import Cart, CartItem
+from apps.cart.models import Cart, CartItem
+
+
+class CartItemInline(admin.TabularInline):
+    model = CartItem
+    extra = 0
+    readonly_fields = ['variant', 'quantity']
 
 
 @admin.register(Cart)
 class CartAdmin(admin.ModelAdmin):
-    list_display = ('user', 'updated_at')
-    search_fields = ('user__email',)
-    ordering = ('-updated_at',)
+    list_display = ['user', 'item_count', 'updated_at']
+    search_fields = ['user__email']
+    inlines = [CartItemInline]
+
+    def item_count(self, obj):
+        return obj.items.count()
+    item_count.short_description = 'Items'
 
 
 @admin.register(CartItem)
 class CartItemAdmin(admin.ModelAdmin):
-    list_display = ('cart', 'variant', 'quantity', 'item_total')
-    search_fields = ('cart__user__email', 'variant__sku')
-    ordering = ('-cart__updated_at',)
-
-# Register your models here.
+    list_display = ['cart', 'variant', 'quantity']
