@@ -17,9 +17,11 @@ ALLOWED_HOSTS = config(
 DATABASES = {
     'default': dj_database_url.config(
         default=config('DATABASE_URL'),
-        conn_max_age=60
+        conn_max_age=60,
+        ssl_require=True
     )
 }
+DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True
 
 # Redis
 CACHES = {
