@@ -1,9 +1,7 @@
 import os
 from celery import Celery
-from dj_database_url import config
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.production' if config(
-    'ENVIRONMENT') == 'production' else 'config.settings.development')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.development')
 
 app = Celery('backend')
 
