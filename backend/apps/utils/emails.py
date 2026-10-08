@@ -1,6 +1,8 @@
 import secrets
-from django.core.mail import send_mail
+import resend
 from backend.config.settings import base
+
+resend.api_key = base.RESEND_API_KEY
 
 
 def send_verification_code(user):
@@ -16,5 +18,9 @@ It’s valid for 10 minutes. Enter this OTP to complete your account signup \n
 The OneStopShop Team.
 """
 
-    send_mail(subject=subject, message=message, from_email=base.EMAIL_HOST_USER,
-              recipient_list=[user.email], fail_silently=False)
+    resend.Emails.send({
+        "from": base.EMAIL_HOST_USER,
+        "to": [user.email],
+        "subject": subject,
+        "text": message,
+    })

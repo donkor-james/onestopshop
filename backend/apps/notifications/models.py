@@ -5,7 +5,7 @@ from apps.accounts.models import User
 
 class Notification(TimeStampedUUIDModel):
     class NotificationType(models.TextChoices):
-        ORDER_CONFIRMED = 'order_confirmed', 'Order Confirmed'
+        ORDER_PAID = 'order_paid', 'Order Paid'
         ORDER_SHIPPED = 'order_shipped', 'Order Shipped'
         ORDER_DELIVERED = 'order_delivered', 'Order Delivered'
         ORDER_CANCELLED = 'order_cancelled', 'Order Cancelled'

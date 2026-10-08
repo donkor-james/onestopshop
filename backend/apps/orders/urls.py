@@ -6,4 +6,6 @@ urlpatterns = [
     path('orders/checkout/', views.CheckoutView.as_view(), name='checkout'),
     path('orders/<str:reference>/',
          views.OrderDetailView.as_view(), name='order-detail'),
+    path("webhooks/paystack/", views.PaystackWebhookView.as_view(),
+         name="paystack-webhook"),
 ]

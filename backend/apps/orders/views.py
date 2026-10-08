@@ -212,6 +212,36 @@ class CheckoutView(generics.GenericAPIView):
                     note='Order placed successfully'
                 )
 
+                paystack_headers = {
+                    'Authorization': f'Bearer {settings.PAYSTACK_SECRET_KEY}',
+                    'Content-Type': 'application/json',
+                }
+
+                # Paystack expects amount in GHS subunits (Pesewas multiply by 100)
+                amount_in_subunits = int(order.total_amount * 100)
+
+                paystack_payload = {
+                    'email': request.user.email,
+                    'amount': amount_in_subunits,
+                    'reference': order.reference,  # Use our custom order reference directly
+                    'metadata': {
+                        'order_id': str(order.id),
+                        'user_id': str(request.user.id),
+                    }
+                }
+
+                paystack_response = requests.post(
+                    settings.PAYSTACK_INITIALIZE_URL,
+                    json=paystack_payload,
+                    headers=paystack_headers,
+                    timeout=10
+                )
+                paystack_data = paystack_response.json()
+
+                if paystack_response.status_code != 200 or not paystack_data.get('status'):
+                    raise ValueError(
+                        'Payment gateway initialization failed. Please try again.')
+
                 # Clear cart in one DELETE query
                 cart.items.all().delete()
 
@@ -222,9 +252,8 @@ class CheckoutView(generics.GenericAPIView):
             )
 
         # Outside atomic block — only reaches here if everything committed
-        send_order_confirmation_email.delay(order.id)
 
-        return Response(
-            OrderSerializer(order).data,
-            status=status.HTTP_201_CREATED
-        )
+        order_data = OrderSerializer(order).data
+        order_data['checkout_url'] = paystack_data['data']['authorization_url']
+
+        return Response(order_data, status=status.HTTP_201_CREATED)

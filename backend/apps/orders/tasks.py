@@ -1,7 +1,9 @@
 from celery import shared_task
-from django.core.mail import send_mail
+import resend
 from django.conf import settings
 import logging
+
+resend.api_key = settings.RESEND_API_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -17,9 +19,11 @@ def send_order_confirmation_email(self, order_id):
 
         order = Order.objects.select_related('user').get(id=order_id)
 
-        send_mail(
-            subject=f'Order Confirmed — #{order.reference}',
-            message=f"""
+        resend.Emails.send({
+            "from": settings.DEFAULT_FROM_EMAIL,
+            "to": [order.user.email],
+            "subject": f'Order Confirmed — #{order.reference}',
+            "text": f"""
                 Hi {order.user.first_name},
 
                 Your order #{order.reference} has been confirmed.
@@ -29,10 +33,7 @@ def send_order_confirmation_email(self, order_id):
 
                 Thank you for shopping with us.
             """,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[order.user.email],
-            fail_silently=False,
-        )
+        })
 
         print(f'Email sent for order {order.reference} to {order.user.email}')
         logger.info(
@@ -55,19 +56,18 @@ def send_shipping_update_email(self, order_id):
 
         order = Order.objects.select_related('user').get(id=order_id)
 
-        send_mail(
-            subject=f'Your Order #{order.reference} Has Shipped',
-            message=f"""
+        resend.Emails.send({
+            "from": settings.DEFAULT_FROM_EMAIL,
+            "to": [order.user.email],
+            "subject": f'Your Order #{order.reference} Has Shipped',
+            "text": f"""
                 Hi {order.user.first_name},
 
                 Great news! Your order #{order.reference} is on its way.
 
                 Thank you for shopping with us.
             """,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[order.user.email],
-            fail_silently=False,
-        )
+        })
 
         print(f'Shipping update email sent for order {order.reference}')
         logger.info(f'Shipping update email sent for order {order.reference}')

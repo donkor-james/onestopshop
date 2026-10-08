@@ -12,7 +12,7 @@ def generate_order_reference():
 class Order(TimeStampedUUIDModel):
     class Status(models.TextChoices):
         PENDING = 'pending', 'Pending'
-        CONFIRMED = 'confirmed', 'Confirmed'
+        PAID = 'PAID', 'paid'
         PROCESSING = 'processing', 'Processing'
         SHIPPED = 'shipped', 'Shipped'
         DELIVERED = 'delivered', 'Delivered'
@@ -29,6 +29,8 @@ class Order(TimeStampedUUIDModel):
         unique=True,
         default=generate_order_reference
     )
+    paystack_reference = models.CharField(
+        max_length=100, unique=True, null=True, blank=True)
     status = models.CharField(
         max_length=20,
         choices=Status.choices,

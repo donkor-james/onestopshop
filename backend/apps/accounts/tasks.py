@@ -1,6 +1,8 @@
-from django.core.mail import send_mail
+import resend
 from django.conf import settings
 import logging
+
+resend.api_key = settings.RESEND_API_KEY
 
 try:
     from celery import shared_task
@@ -28,8 +30,12 @@ It’s valid for 10 minutes. Enter this OTP to complete your account signup \n
 The OneStopShop Team.
 """
     try:
-        send_mail(subject=subject, message=message, from_email=settings.EMAIL_HOST_USER,
-                  recipient_list=[user.email], fail_silently=False)
+        resend.Emails.send({
+            "from": settings.EMAIL_HOST_USER,
+            "to": [user.email],
+            "subject": subject,
+            "text": message,
+        })
         logger.info(f"OTP email sent to {user.email} with OTP: {otp}")
     except Exception as e:
         logger.error(f"Failed to send OTP email to {user.email}: {e}")
