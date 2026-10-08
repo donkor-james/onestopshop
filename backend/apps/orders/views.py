@@ -1,3 +1,4 @@
+import requests
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from django.conf import settings
