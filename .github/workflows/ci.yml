@@ -1,12 +1,25 @@
-name: Tests
+name: CI
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    - cron: "*/10 * * * *"
 
-jobs:
+  jobs:
+    cleanup:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+        - uses: actions/setup-python@v5
+          with: { python-version: "3.12" }
+        - run: pip install -r backend/requirements.txt
+        - run: cd backend && python manage.py shell -c "from apps.orders.tasks import cancel_unpaid_orders; print(cancel_unpaid_orders())"
+          env:
+            DJANGO_SETTINGS_MODULE: config.settings.production
+            DATABASE_URL: ${{ secrets.DATABASE_URL }}
   test:
     runs-on: ubuntu-latest
     defaults:

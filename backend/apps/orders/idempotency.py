@@ -7,7 +7,6 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
-
 from apps.orders.models import IdempotencyKey
 
 KEY_MAX_LENGTH = 128
