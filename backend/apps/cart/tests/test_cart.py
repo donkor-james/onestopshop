@@ -22,7 +22,7 @@ class TestCartItemAdd:
         client, user = authenticated_client
         variant = make_variant(stock_qty=10, price_override='100.00')
 
-        response = client.post(reverse('cart-add'), {
+        response = client.post(reverse('cart-item-create'), {
             'variant_id': str(variant.id),
             'quantity': 2
         }, format='json')
@@ -33,7 +33,7 @@ class TestCartItemAdd:
         client, user = authenticated_client
         variant = make_variant(stock_qty=5, price_override='100.00')
 
-        response = client.post(reverse('cart-add'), {
+        response = client.post(reverse('cart-item-create'), {
             'variant_id': str(variant.id),
             'quantity': 10
         }, format='json')
@@ -47,7 +47,7 @@ class TestCartClear:
         client, user = authenticated_client
         variant = make_variant(stock_qty=10, price_override='100.00')
 
-        client.post(reverse('cart-add'), {
+        client.post(reverse('cart-item-create'), {
             'variant_id': str(variant.id),
             'quantity': 1
         }, format='json')

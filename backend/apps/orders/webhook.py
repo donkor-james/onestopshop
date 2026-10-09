@@ -1,67 +1,94 @@
-# apps/orders/webhooks.py
-import hmac
 import hashlib
+import hmac
 import json
+import logging
+
 from django.conf import settings
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
-from rest_framework.views import APIView
+from rest_framework import permissions, status
 from rest_framework.response import Response
-from rest_framework import status, permissions
+from rest_framework.views import APIView
+
+from apps.orders.models import Order
 from apps.orders.tasks import send_order_confirmation_email
-from .models import Order
+
+logger = logging.getLogger(__name__)
+
+
+def _ok(label='ok'):
+    return Response({'status': label}, status=status.HTTP_200_OK)
 
 
 class PaystackWebhookView(APIView):
+    """
+    Paystack delivers events at-least-once, so this handler must be idempotent.
+    Rule: always answer 2xx for anything we have fully understood (including
+    duplicates and events we deliberately ignore) - a non-2xx makes Paystack retry.
+    """
     permission_classes = [permissions.AllowAny]
+    authentication_classes = []
 
     def post(self, request, *args, **kwargs):
-        paystack_signature = request.headers.get("x-paystack-signature")
+        signature = request.headers.get('x-paystack-signature')
+        if not signature:
+            return Response({'error': 'Missing signature'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not paystack_signature:
-            return Response({"error": "Missing signature"}, status=status.HTTP_400_BAD_REQUEST)
-
-        # 1. Verify HMAC-SHA512 signature against raw body bytes
         raw_body = request.body
-        expected_signature = hmac.new(
-            key=settings.PAYSTACK_SECRET_KEY.encode("utf-8"),
-            msg=raw_body,
-            digestmod=hashlib.sha512
+        expected = hmac.new(
+            settings.PAYSTACK_SECRET_KEY.encode(
+                'utf-8'), raw_body, hashlib.sha512
         ).hexdigest()
+        if not hmac.compare_digest(expected, signature):
+            return Response({'error': 'Invalid signature'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not hmac.compare_digest(expected_signature, paystack_signature):
-            return Response({"error": "Invalid signature"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            payload = json.loads(raw_body.decode('utf-8'))
+        except ValueError:
+            return Response({'error': 'Invalid JSON'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 2. Parse Payload
-        payload = json.loads(raw_body.decode("utf-8"))
-        event_type = payload.get("event")
+        if payload.get('event') != 'charge.success':
+            return _ok('ignored')
 
-        # 3. Handle charge.success
-        if event_type == "charge.success":
-            data = payload.get("data", {})
-            reference = data.get("reference")
-            metadata = data.get("metadata", {})
-            order_id = metadata.get("order_id")
+        data = payload.get('data') or {}
+        reference = data.get('reference')
+        order_id = (data.get('metadata') or {}).get('order_id')
+        if not order_id:
+            logger.warning(
+                'charge.success without order_id (reference=%s)', reference)
+            return _ok('ignored')
 
-            with transaction.atomic():
-                try:
-                    order = Order.objects.select_for_update().get(id=order_id)
-                    if order.status != Order.Status.PAID:
-                        order.status = Order.Status.PAID
-                        order.paystack_reference = reference
-                        order.save()
+        with transaction.atomic():
+            try:
+                order = Order.objects.select_for_update().get(id=order_id)
+            except (Order.DoesNotExist, DjangoValidationError, ValueError):
+                logger.warning(
+                    'charge.success for unknown order %s (reference=%s)', order_id, reference)
+                return _ok('ignored')
 
-                        # Create an OrderEvent for the status change
-                        order.events.create(
-                            status=Order.Status.PAID,
-                            note=f'Payment confirmed via Paystack webhook (ref: {reference})'
-                        )
+            if order.status != Order.Status.PENDING:
+                if order.status != Order.Status.PAID:
+                    logger.error(
+                        'Payment %s received for order %s in status %s - needs manual review/refund',
+                        reference, order.reference, order.status)
+                return _ok('already_processed')
 
-                        order_to_notify = order.id
+            expected_amount = int(
+                (order.total_amount * 100).to_integral_value())
+            if data.get('amount') != expected_amount:
+                logger.error('Amount mismatch for order %s: paid %s, expected %s',
+                             order.reference, data.get('amount'), expected_amount)
+                return _ok('amount_mismatch')
 
-                except Order.DoesNotExist:
-                    return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+            order.status = Order.Status.PAID
+            order.paystack_reference = reference
+            order.save(update_fields=[
+                       'status', 'paystack_reference', 'updated_at'])
+            order.events.create(
+                status=Order.Status.PAID,
+                note=f'Payment confirmed via Paystack webhook (ref: {reference})')
+            order_pk = str(order.id)
+            transaction.on_commit(
+                lambda: send_order_confirmation_email.delay(order_pk))
 
-            if order_to_notify:
-                send_order_confirmation_email.delay(order_to_notify)
-
-        return Response({"status": "success"}, status=status.HTTP_200_OK)
+        return _ok()

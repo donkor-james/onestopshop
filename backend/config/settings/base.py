@@ -133,12 +133,16 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.cart.tasks.cleanup_abandoned_carts',
         'schedule': 60 * 60 * 24,  # daily
     },
-    'low-stock-alert': {
-        'task': 'apps.products.tasks.send_low_stock_alert',
-        'schedule': 60 * 60 * 12,  # twice daily
-    },
     'delete-old-notifications': {
         'task': 'apps.notifications.tasks.delete_old_notifications',
+        'schedule': 60 * 60 * 24,  # daily
+    },
+    'cancel-unpaid-orders': {
+        'task': 'apps.orders.tasks.cancel_unpaid_orders',
+        'schedule': 60 * 10,  # every 10 minutes
+    },
+    'delete-old-idempotency-keys': {
+        'task': 'apps.orders.tasks.delete_old_idempotency_keys',
         'schedule': 60 * 60 * 24,  # daily
     },
 }

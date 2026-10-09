@@ -1,18 +1,17 @@
-import requests
+import logging
+from django.db.models import Count, Prefetch
+from django.shortcuts import get_object_or_404
+from drf_spectacular.utils import extend_schema
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
-from django.conf import settings
 from rest_framework.response import Response
-from django.db import transaction
-from django.db.models import Count, F, Prefetch
-from django.utils import timezone
-from apps.orders.models import Order, OrderItem, OrderEvent
-from apps.orders.serializers import OrderSerializer, CheckoutSerializer
-from apps.orders.tasks import send_order_confirmation_email
-from apps.cart.models import Cart, CartItem
+from rest_framework.views import APIView
 from apps.accounts.models import Address
-from apps.discounts.models import DiscountCode
-from drf_spectacular.utils import extend_schema, OpenApiParameter
+from apps.orders.idempotency import idempotent
+from apps.orders.models import Order, OrderEvent, OrderItem
+from apps.orders.payments import PaymentGatewayError, initialize_payment
+from apps.orders.serializers import CheckoutSerializer, OrderSerializer
+from apps.orders.services import CheckoutError, create_order_from_cart
 
 
 class OrderListView(generics.ListAPIView):
@@ -69,7 +68,7 @@ class OrderDetailView(generics.RetrieveAPIView):
                         'variant__product'
                     )
                 ),
-                # prefetch events for audit log — already ordered by created_at
+                # prefetch events for audit log
                 Prefetch(
                     'events',
                     queryset=OrderEvent.objects.only(
@@ -88,174 +87,62 @@ class CheckoutView(generics.GenericAPIView):
     @extend_schema(
         summary='Checkout',
         description="""
-            Creates an order from the current cart.
-            Applies discount if provided.
-            Deducts stock atomically.
-            Fires order confirmation email via Celery.
+            Creates a PENDING order from the current cart and starts a Paystack payment.
+
+            Requires an `Idempotency-Key` header (e.g. a UUID generated once per checkout
+            attempt). Retrying with the same key and body returns the original response
+            instead of creating a second order.
+
+            Stock is reserved atomically; unpaid orders are cancelled and their stock
+            released automatically after a timeout.
         """,
         responses={201: OrderSerializer}
     )
+    @idempotent
     def post(self, request):
         serializer = self.get_serializer(
-            data=request.data,
-            context={'request': request}
-        )
+            data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
 
-        # Fetch cart with all related data upfront —
-        # one query with joins rather than multiple queries inside the transaction
-        cart = (
-            Cart.objects
-            .prefetch_related(
-                Prefetch(
-                    'items',
-                    queryset=CartItem.objects.select_related(
-                        'variant__product'
-                    )
-                )
-            )
-            .filter(user=request.user)
-            .first()
-        )
-
-        if not cart or not cart.items.exists():
-            return Response(
-                {'error': 'Your cart is empty'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        address = Address.objects.only(
-            'address_line1', 'city', 'region', 'country'
-        ).get(id=serializer.validated_data['address_id'])
-
-        discount = None
-        discount_code = serializer.validated_data.get('discount_code')
+        address = Address.objects.get(
+            id=serializer.validated_data['address_id'], user=request.user)
 
         try:
-            with transaction.atomic():
-                # Calculate total in Python from already-fetched cart items —
-                # no extra query needed since we prefetched everything above
-                total = sum(
-                    item.variant.effective_price * item.quantity
-                    for item in cart.items.all()
-                )
-
-                if discount_code:
-                    # select_for_update() locks this discount row —
-                    # prevents two simultaneous checkouts both reading
-                    # used_count=9 and both thinking they're the 10th use
-                    # when limit is 10
-                    discount = DiscountCode.objects.select_for_update().get(
-                        code=discount_code.upper(),
-                        is_active=True,
-                        valid_until__gte=timezone.now()
-                    )
-                    total = discount.apply_to(total)
-
-                    # F() at DB level — avoids race condition on used_count
-                    DiscountCode.objects.filter(pk=discount.pk).update(
-                        used_count=F('used_count') + 1
-                    )
-
-                order = Order.objects.create(
-                    user=request.user,
-                    total_amount=max(total, 0),
-                    shipping_address={
-                        'address_line': address.address_line1,
-                        'city': address.city,
-                        'region': address.region,
-                        'country': address.country,
-                    },
-                    discount=discount
-                )
-
-                # Validate stock and build order items list
-                order_items = []
-                variant_updates = []
-
-                for item in cart.items.all():
-                    # select_for_update() already applied via prefetch above —
-                    # re-fetch just the variants that need stock deduction
-                    variant = (
-                        item.variant.__class__.objects
-                        .select_for_update()
-                        .get(pk=item.variant.pk)
-                    )
-
-                    if variant.stock_qty < item.quantity:
-                        raise ValueError(
-                            f'"{item.variant.product.name}" is out of stock'
-                        )
-
-                    order_items.append(OrderItem(
-                        order=order,
-                        variant=variant,
-                        quantity=item.quantity,
-                        unit_price=variant.effective_price
-                    ))
-
-                    variant_updates.append((variant.pk, item.quantity))
-
-                # bulk_create: inserts all order items in ONE query
-                # instead of one INSERT per item
-                OrderItem.objects.bulk_create(order_items)
-
-                # Update stock using F() for each variant —
-                # DB-level decrement, no race condition
-                for variant_pk, qty in variant_updates:
-                    item.variant.__class__.objects.filter(
-                        pk=variant_pk
-                    ).update(stock_qty=F('stock_qty') - qty)
-
-                # Record first order event
-                OrderEvent.objects.create(
-                    order=order,
-                    status=Order.Status.PENDING,
-                    note='Order placed successfully'
-                )
-
-                paystack_headers = {
-                    'Authorization': f'Bearer {settings.PAYSTACK_SECRET_KEY}',
-                    'Content-Type': 'application/json',
-                }
-
-                # Paystack expects amount in GHS subunits (Pesewas multiply by 100)
-                amount_in_subunits = int(order.total_amount * 100)
-
-                paystack_payload = {
-                    'email': request.user.email,
-                    'amount': amount_in_subunits,
-                    'reference': order.reference,  # Use our custom order reference directly
-                    'metadata': {
-                        'order_id': str(order.id),
-                        'user_id': str(request.user.id),
-                    }
-                }
-
-                paystack_response = requests.post(
-                    settings.PAYSTACK_INITIALIZE_URL,
-                    json=paystack_payload,
-                    headers=paystack_headers,
-                    timeout=10
-                )
-                paystack_data = paystack_response.json()
-
-                if paystack_response.status_code != 200 or not paystack_data.get('status'):
-                    raise ValueError(
-                        'Payment gateway initialization failed. Please try again.')
-
-                # Clear cart in one DELETE query
-                cart.items.all().delete()
-
-        except ValueError as e:
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_400_BAD_REQUEST
+            order = create_order_from_cart(
+                user=request.user,
+                address=address,
+                discount_code=serializer.validated_data.get('discount_code'),
             )
+        except CheckoutError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Outside atomic block — only reaches here if everything committed
+        # The order and stock reservation are committed at this point. The
+        # external HTTP call happens OUTSIDE any transaction so no row locks
+        # are held while we wait on Paystack.
+        data = OrderSerializer(order).data
+        try:
+            data['checkout_url'] = initialize_payment(order, request.user)
+        except PaymentGatewayError as exc:
+            data['checkout_url'] = None
+            data['payment_error'] = (
+                f'{exc} Retry with POST /api/orders/{order.reference}/pay/')
 
-        order_data = OrderSerializer(order).data
-        order_data['checkout_url'] = paystack_data['data']['authorization_url']
+        return Response(data, status=status.HTTP_201_CREATED)
 
-        return Response(order_data, status=status.HTTP_201_CREATED)
+
+class OrderPayView(APIView):
+    """(Re)start payment for an order that is still pending."""
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(summary='Start or retry payment for a pending order',
+                   request=None, responses={200: None})
+    def post(self, request, reference):
+        order = get_object_or_404(
+            Order, reference=reference, user=request.user,
+            status=Order.Status.PENDING)
+        try:
+            url = initialize_payment(order, request.user, retry=True)
+        except PaymentGatewayError as exc:
+            return Response({'error': str(exc)},
+                            status=status.HTTP_502_BAD_GATEWAY)
+        return Response({'checkout_url': url})

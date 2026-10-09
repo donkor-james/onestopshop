@@ -1,8 +1,9 @@
+import uuid
 from django.db import models
+from django.conf import settings
 from apps.core.models import TimeStampedUUIDModel
 from apps.accounts.models import User
 from apps.discounts.models import DiscountCode
-import uuid
 
 
 def generate_order_reference():

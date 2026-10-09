@@ -18,7 +18,9 @@ logger = logging.getLogger(__name__)
 
 
 @shared_task(name='send_otp_code')
-def send_otp_code(user, otp):
+def send_otp_code(user_id, otp):
+    from apps.accounts.models import User
+    user = User.objects.get(pk=user_id)
 
     subject = "OneStopShop Email Verification"
     message = f"""

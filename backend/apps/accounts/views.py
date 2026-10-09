@@ -20,7 +20,10 @@ from .serializers import (
     AddressSerializer,
     VerifyOtpSerializer
 )
+from django.conf import settings
 from .tasks import send_otp_code
+
+MAX_OTP_ATTEMPTS = 5
 
 
 def generate_otp():
@@ -54,7 +57,7 @@ class RegisterView(APIView):
 
         # Store OTP in cache for 10 minutes
         cache.set(f"otp:{user.email}", otp, timeout=1000)
-        send_otp_code.delay(user, otp)
+        send_otp_code.delay(str(user.id), otp)
 
         return Response(
             {"detail": "Registration successful. A verification code has been sent to your email."},
@@ -198,6 +201,15 @@ class VerifyOtpView(generics.GenericAPIView):
             otp = serializer.validated_data.get("otp")
 
             # Retrieve the stored OTP from cache
+            attempts_key = f"otp_attempts:{email}"
+            cache.add(attempts_key, 0, timeout=1000)
+            if cache.get(attempts_key, 0) >= MAX_OTP_ATTEMPTS:
+                cache.delete(f"otp:{email}")
+                return Response(
+                    {"detail": "Too many incorrect attempts. Please request a new code."},
+                    status=status.HTTP_429_TOO_MANY_REQUESTS
+                )
+
             stored_otp = cache.get(f"otp:{email}")
 
             if stored_otp is None:
@@ -207,6 +219,7 @@ class VerifyOtpView(generics.GenericAPIView):
                 )
 
             if stored_otp != otp:
+                cache.incr(attempts_key)
                 return Response(
                     {"detail": "Invalid OTP."},
                     status=status.HTTP_400_BAD_REQUEST
@@ -236,6 +249,7 @@ class VerifyOtpView(generics.GenericAPIView):
     tags=['Auth'],
     summary='Logout',
     description="""
+        Logs out the user by blacklisting the provided refresh token.
         Blacklists the provided refresh token, effectively logging the user out.
         The access token will expire naturally after its lifetime.
     """,

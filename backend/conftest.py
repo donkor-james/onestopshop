@@ -1,5 +1,9 @@
+import uuid
+from unittest.mock import MagicMock, patch
+
 import pytest
 import factory
+from django.core.cache import cache
 from django.contrib.auth import get_user_model
 from apps.products.models import Category, Product, ProductVariant
 from apps.discounts.models import DiscountCode
@@ -98,3 +102,28 @@ def make_discount(db):
     def _make(**kwargs):
         return DiscountCodeFactory(**kwargs)
     return _make
+
+
+@pytest.fixture(autouse=True)
+def clear_cache():
+    """cache_page / cart / discount caches must not leak between tests."""
+    cache.clear()
+    yield
+    cache.clear()
+
+
+@pytest.fixture
+def paystack_ok():
+    """Stub Paystack's initialize endpoint so tests never touch the network."""
+    with patch('apps.orders.payments.requests.post') as post:
+        response = MagicMock(status_code=200)
+        response.json.return_value = {
+            'status': True,
+            'data': {'authorization_url': 'https://checkout.paystack.test/abc'},
+        }
+        post.return_value = response
+        yield post
+
+
+def idem_key():
+    return {'HTTP_IDEMPOTENCY_KEY': str(uuid.uuid4())}

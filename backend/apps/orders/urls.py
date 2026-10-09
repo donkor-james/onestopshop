@@ -4,6 +4,8 @@ from . import views, webhook
 urlpatterns = [
     path('orders/', views.OrderListView.as_view(), name='order-list'),
     path('orders/checkout/', views.CheckoutView.as_view(), name='checkout'),
+    path('orders/<str:reference>/pay/',
+         views.OrderPayView.as_view(), name='order-pay'),
     path('orders/<str:reference>/',
          views.OrderDetailView.as_view(), name='order-detail'),
     path("webhooks/paystack/", webhook.PaystackWebhookView.as_view(),

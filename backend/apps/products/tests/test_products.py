@@ -31,13 +31,13 @@ class TestProductDetail:
         product = make_product()
         make_variant(product=product)
         response = api_client.get(
-            reverse('product-detail', kwargs={'slug': product.slug})
+            reverse('product-detail-slug', kwargs={'slug': product.slug})
         )
         assert response.status_code == 200
 
     def test_inactive_product_returns_404(self, api_client, make_product):
         product = make_product(is_active=False)
         response = api_client.get(
-            reverse('product-detail', kwargs={'slug': product.slug})
+            reverse('product-detail-slug', kwargs={'slug': product.slug})
         )
         assert response.status_code == 404
