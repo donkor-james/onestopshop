@@ -1,0 +1,40 @@
+# Render's free web service sleeps when idle, so the embedded Celery Beat can't
+# be relied on for housekeeping. This runs the same tasks from GitHub instead.
+name: Scheduled cleanup
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings.production
+      # Use Supabase's connection-pooler URL (the direct host is IPv6-only).
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      # Required by settings at import time; these tasks never use them.
+      REDIS_URL: redis://localhost:6379/0
+      RESEND_API_KEY: unused
+      EMAIL_HOST_USER: unused@example.com
+      EMAIL_HOST_PASSWORD: unused
+      PAYSTACK_SECRET_KEY: unused
+      PAYSTACK_PUBLIC_KEY: unused
+      ALLOWED_HOSTS: "*"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r requirements.txt
+      - name: Cancel unpaid orders and release stock
+        run: python manage.py shell -c "from apps.orders.tasks import cancel_unpaid_orders; print('cancelled:', cancel_unpaid_orders())"
+      - name: Delete expired idempotency keys
+        run: python manage.py shell -c "from apps.orders.tasks import delete_old_idempotency_keys; print('deleted:', delete_old_idempotency_keys())"
