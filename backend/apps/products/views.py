@@ -2,6 +2,10 @@ from rest_framework import generics, filters
 from rest_framework.permissions import IsAdminUser, AllowAny, IsAuthenticatedOrReadOnly
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Avg, Count, Min, Sum, Prefetch
+from django.db.models import (
+    Avg, Count, DecimalField, FloatField, IntegerField, Min, OuterRef,
+    Prefetch, Subquery, Sum)
+from django.db.models.functions import Coalesce
 from django.utils.decorators import method_decorator
 from drf_spectacular.utils import extend_schema, OpenApiResponse, inline_serializer
 from django.views.decorators.cache import cache_page
@@ -88,9 +92,19 @@ class ProductListView(generics.ListAPIView):
                 )
             )
             .annotate(
-                avg_rating=Avg('reviews__rating'),
-                review_count=Count('reviews', distinct=True),
-                min_price=Min('variants__price_override')
+                avg_rating=Subquery(
+                    Review.objects.filter(product=OuterRef('pk')).order_by()
+                    .values('product').annotate(v=Avg('rating')).values('v'),
+                    output_field=FloatField()),
+                review_count=Coalesce(Subquery(
+                    Review.objects.filter(product=OuterRef('pk')).order_by()
+                    .values('product').annotate(v=Count('pk')).values('v'),
+                    output_field=IntegerField()), 0),
+                min_price=Subquery(
+                    ProductVariant.objects.filter(
+                        product=OuterRef('pk')).order_by()
+                    .values('product').annotate(v=Min('price_override')).values('v'),
+                    output_field=DecimalField(max_digits=10, decimal_places=2)),
             )
             .only(
                 'id', 'name', 'slug', 'base_price',

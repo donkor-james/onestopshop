@@ -98,9 +98,10 @@ class ProductListSerializer(serializers.ModelSerializer):
     def get_primary_image(self, obj):
         # Variants and their images are already prefetched —
         # no extra query here
-        first_variant = obj.variants.all().first()
-        if not first_variant:
+        variants = list(obj.variants.all())
+        if not variants:
             return None
+        first_variant = variants[0]
         for image in first_variant.images.all():
             if image.is_primary:
                 return image.image.url

@@ -2,6 +2,8 @@ from django.db import models
 from django.utils.text import slugify
 from apps.core.models import TimeStampedUUIDModel
 from .category import Category
+from django.contrib.postgres.indexes import GinIndex, OpClass
+from django.db.models.functions import Upper
 
 
 class ProductQuerySet(models.QuerySet):
@@ -50,6 +52,18 @@ class Product(TimeStampedUUIDModel):
             models.Index(
                 fields=['category', 'is_active', 'base_price'],
                 name='idx_prod_cat_act_pri'  # Shortened name
+            ),
+            models.Index(
+                fields=['is_active', '-created_at'],
+                name='idx_prod_active_created'
+            ),
+            GinIndex(
+                OpClass(Upper('name'), name='gin_trgm_ops'),
+                name='idx_prod_name_trgm'
+            ),
+            GinIndex(
+                OpClass(Upper('description'), name='gin_trgm_ops'),
+                name='idx_prod_desc_trgm'
             ),
         ]
 
