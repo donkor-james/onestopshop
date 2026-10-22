@@ -4,6 +4,9 @@ import pytest
 from django.core.cache import cache
 from django.urls import reverse
 from conftest import UserFactory
+import secrets
+
+TEST_PASSWORD = f"{secrets.token_urlsafe(12)}Aa1!"
 
 
 @pytest.mark.django_db
@@ -13,7 +16,7 @@ class TestOtp:
         with patch('apps.accounts.views.send_otp_code.delay') as delay:
             response = api_client.post(reverse('register'), {
                 'email': 'new@example.com', 'first_name': 'New', 'last_name': 'User',
-                'password': 'Str0ng-pass-123', 'confirm_password': 'Str0ng-pass-123',
+                'password': TEST_PASSWORD, 'confirm_password': TEST_PASSWORD,
             }, format='json')
         assert response.status_code == 201
         json.dumps(list(delay.call_args.args))  # must not raise
